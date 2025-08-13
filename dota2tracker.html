@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dota 2 Progress Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(-100%); }
+            to { transform: translateX(0); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #141823;
+            --bg-card: #1e2328;
+            --text-primary: #ffffff;
+            --text-secondary: #8596a5;
+            --win: #4CAF50;
+            --loss: #f44336;
+            --border: #2a2d35;
+            --gradient-1: #667eea;
+            --gradient-2: #764ba2;
+            --gold: #FFD700;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(-45deg, #0a0e1a, #1a1f2e, #0f1923, #1e2328);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 60px 0 40px;
+            position: relative;
+            animation: fadeIn 1s ease;
+        }
+
+        header::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(102, 126, 234, 0.1) 0%, transparent 70%);
+            border-radius: 50%;
+            z-index: -1;
+        }
+
+        h1 {
+            font-size: 4rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, #667eea, #764ba2, #f77062);
+            background-size: 200% 200%;
+            animation: gradientShift 3s ease infinite;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+            letter-spacing: -2px;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.2rem;
+            font-weight: 300;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .input-section {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin: 40px 0;
+            flex-wrap: wrap;
+            animation: fadeIn 1.2s ease;
+        }
+
+        input[type="text"] {
+            padding: 18px 25px;
+            border: 2px solid transparent;
+            background: linear-gradient(var(--bg-card), var(--bg-card)) padding-box,
+                        linear-gradient(135deg, var(--gradient-1), var(--gradient-2)) border-box;
+            color: var(--text-primary);
+            border-radius: 50px;
+            font-size: 16px;
+            width: 350px;
+            transition: all 0.3s ease;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
+        }
+
+        input[type="text"]::placeholder {
+            color: var(--text-secondary);
+        }
+
+        button {
+            padding: 18px 40px;
+            background: linear-gradient(135deg, var(--gradient-1), var(--gradient-2));
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        button:hover::before {
+            left: 100%;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px rgba(102, 126, 234, 0.5);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .loading.active {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 20px;
+            border: 4px solid var(--border);
+            border-top: 4px solid var(--gradient-1);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: linear-gradient(135deg, rgba(244, 67, 54, 0.1), rgba(255, 87, 34, 0.1));
+            border: 2px solid var(--loss);
+            color: #ff6b6b;
+            padding: 20px;
+            border-radius: 20px;
+            margin: 20px auto;
+            max-width: 600px;
+            display: none;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .error.active {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .profile-header {
+            background: linear-gradient(135deg, var(--bg-card), rgba(30, 35, 40, 0.8));
+            border-radius: 30px;
+            padding: 40px;
+            margin: 30px 0;
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            border: 1px solid var(--border);
+            backdrop-filter: blur(10px);
+            animation: fadeIn 1s ease;
+        }
+
+        .profile-avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 20px;
+            background: linear-gradient(135deg, var(--gradient-1), var(--gradient-2));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+
+        .profile-info {
+            flex: 1;
+        }
+
+        .profile-name {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .profile-stats {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+
+        .profile-stat {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .profile-stat-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .profile-stat-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin: 40px 0;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, var(--bg-card), rgba(30, 35, 40, 0.8));
+            padding: 30px;
+            border-radius: 25px;
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+            animation: fadeIn 1s ease backwards;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(102, 126, 234, 0.1) 0%, transparent 70%);
+            transition: all 0.5s ease;
+            opacity: 0;
+        }
+
+        .stat-card:hover::before {
+            opacity: 1;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+            border-color: var(--gradient-1);
+        }
+
+        .stat-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, var(--gradient-1), var(--gradient-2));
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 500;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #fff, #e0e0e0);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .stat-change {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .stat-change.positive {
+            color: var(--win);
+        }
+
+        .stat-change.negative {
+            color: var(--loss);
+        }
+
+        .chart-container {
+            background: linear-gradient(135deg, var(--bg-card), rgba(30, 35, 40, 0.8));
+            border: 1px solid var(--border);
+            border-radius: 25px;
+            padding: 30px;
+            margin: 30px 0;
+            backdrop-filter: blur(10px);
+            animation: fadeIn 1.2s ease;
+        }
+
+        .chart-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .tabs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 40px 0;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 14px 28px;
+            background: var(--bg-card);
+            border: 2px solid var(--border);
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.9rem;
+        }
+
+        .tab:hover {
+            transform: translateY(-2px);
+            border-color: var(--gradient-1);
+        }
+
+        .tab.active {
+            background: linear-gradient(135deg, var(--gradient-1), var(--gradient-2));
+            border-color: transparent;
+            color: white;
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .hero-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 30px 0;
+        }
+
+        .hero-card {
+            background: linear-gradient(135deg, var(--bg-card), rgba(30, 35, 40, 0.9));
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 15px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--gradient-1), var(--gradient-2));
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .hero-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .hero-card:hover {
+            transform: translateY(-5px) scale(1.05);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            border-color: var(--gradient-1);
+        }
+
+        .hero-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 10px;
+            border-radius: 15px;
+            background-size: cover;
+            background-position: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .hero-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .hero-stats {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .hero-winrate {
+            margin-top: 5px;
+            font-weight: 600;
+        }
+
+        .hero-winrate.good {
+            color: var(--win);
+        }
+
+        .hero-winrate.bad {
+            color: var(--loss);
+        }
+
+        .match-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .match-card {
+            background: linear-gradient(135deg, var(--bg-card), rgba(30, 35, 40, 0.9));
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 25px;
+            display: flex;
+            align-items: center;
+            gap: 25px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            animation: slideIn 0.5s ease backwards;
+        }
+
+        .match-card::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 5px;
+        }
+
+        .match-card.win::before {
+            background: linear-gradient(180deg, var(--win), #66BB6A);
+        }
+
+        .match-card.loss::before {
+            background: linear-gradient(180deg, var(--loss), #ef5350);
+        }
+
+        .match-card:hover {
+            transform: translateX(10px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .match-hero {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 100px;
+        }
+
+        .match-hero-icon {
+            width: 70px;
+            height: 70px;
+            border-radius: 15px;
+            background-size: cover;
+            background-position: center;
+            margin-bottom: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .match-hero-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .match-details {
+            flex: 1;
+        }
+
+        .match-result {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .match-result.win {
+            background: linear-gradient(135deg, var(--win), #66BB6A);
+            color: white;
+        }
+
+        .match-result.loss {
+            background: linear-gradient(135deg, var(--loss), #ef5350);
+            color: white;
+        }
+
+        .match-kda {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin: 10px 0;
+            background: linear-gradient(135deg, #fff, #e0e0e0);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .match-kda span {
+            color: var(--text-secondary);
+            font-size: 1.4rem;
+        }
+
+        .match-stats {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .match-stat {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .match-stat-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .match-stat-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .match-items {
+            display: flex;
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .item-slot {
+            width: 45px;
+            height: 45px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background-size: cover;
+            background-position: center;
+            transition: all 0.3s ease;
+        }
+
+        .item-slot:hover {
+            transform: scale(1.1);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+        }
+
+        .match-meta {
+            text-align: right;
+            min-width: 150px;
+        }
+
+        .match-duration {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 5px;
+        }
+
+        .match-mode {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 5px;
+        }
+
+        .match-time {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .winrate-bar {
+            height: 10px;
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 10px;
+            position: relative;
+        }
+
+        .winrate-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--win), #66BB6A);
+            transition: width 1.5s ease;
+            position: relative;
+            box-shadow: 0 0 20px rgba(76, 175, 80, 0.5);
+        }
+
+        .winrate-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .rank-display {
+            background: linear-gradient(135deg, var(--bg-card), rgba(30, 35, 40, 0.9));
+            border: 2px solid var(--gold);
+            border-radius: 25px;
+            padding: 30px;
+            text-align: center;
+            margin: 30px 0;
+            position: relative;
+            overflow: hidden;
+            animation: pulse 2s infinite;
+        }
+
+        .rank-display::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255, 215, 0, 0.1) 0%, transparent 70%);
+            animation: spin 10s linear infinite;
+        }
+
+        .rank-medal {
+            font-size: 5rem;
+            margin-bottom: 15px;
+            filter: drop-shadow(0 5px 15px rgba(255, 215, 0, 0.5));
+            animation: pulse 2s infinite;
+        }
+
+        .rank-title {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--gold), #fff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .mmr-value {
+            font-size: 1.5rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 2.5rem; }
+            .profile-header { flex-direction: column; text-align: center; }
+            .match-card { flex-direction: column; text-align: center; }
+            .match-meta { text-align: center; }
+            .stats-grid { grid-template-columns: 1fr; }
+            .hero-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>DOTA 2 TRACKER</h1>
+            <p class="subtitle">Elevate Your Game</p>
+        </header>
+
+        <div class="input-section">
+            <input type="text" id="steamId" placeholder="Enter Steam ID or OpenDota Player ID" />
+            <button onclick="fetchData()">🚀 Load Stats</button>
+            <button onclick="refreshData()" style="display: none;" id="refreshBtn">🔄 Refresh</button>
+        </div>
+
+        <div class="loading">
+            <div class="loading-spinner"></div>
+            <p>Summoning the Ancient's wisdom...</p>
+        </div>
+
+        <div class="error" id="error"></div>
+
+        <div id="content" style="display: none;">
+            <div class="profile-header" id="profileHeader" style="display: none;">
+                <div class="profile-avatar" id="profileAvatar">👤</div>
+                <div class="profile-info">
+                    <div class="profile-name" id="profileName">Anonymous Hero</div>
+                    <div class="profile-stats">
+                        <div class="profile-stat">
+                            <span class="profile-stat-label">Total Matches</span>
+                            <span class="profile-stat-value" id="profileMatches">0</span>
+                        </div>
+                        <div class="profile-stat">
+                            <span class="profile-stat-label">Win Rate</span>
+                            <span class="profile-stat-value" id="profileWinrate">0%</span>
+                        </div>
+                        <div class="profile-stat">
+                            <span class="profile-stat-label">Best Streak</span>
+                            <span class="profile-stat-value" id="profileStreak">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rank-display" id="rankDisplay" style="display: none;">
+                <div class="rank-medal" id="rankMedal">🎖️</div>
+                <div class="rank-title" id="rankTitle">Unranked</div>
+                <div class="mmr-value" id="mmrValue">Calibrating...</div>
+            </div>
+
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab(event, 'overview')">Overview</div>
+                <div class="tab" onclick="switchTab(event, 'heroes')">Heroes</div>
+                <div class="tab" onclick="switchTab(event, 'matches')">Matches</div>
+                <div class="tab" onclick="switchTab(event, 'charts')">Analytics</div>
+            </div>
+
+            <div id="overview" class="tab-content active">
+                <div class="stats-grid">
+                    <div class="stat-card" style="animation-delay: 0.1s;">
+                        <div class="stat-icon">🏆</div>
+                        <div class="stat-label">Total Matches</div>
+                        <div class="stat-value" id="totalMatches">0</div>
+                        <div class="stat-change positive" id="matchChange"></div>
+                    </div>
+                    <div class="stat-card" style="animation-delay: 0.2s;">
+                        <div class="stat-icon">📈</div>
+                        <div class="stat-label">Win Rate</div>
+                        <div class="stat-value" id="winRate">0%</div>
+                        <div class="winrate-bar">
+                            <div class="winrate-fill" id="winrateFill"></div>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="animation-delay: 0.3s;">
+                        <div class="stat-icon">⚔️</div>
+                        <div class="stat-label">Average KDA</div>
+                        <div class="stat-value" id="avgKDA">0.0</div>
+                        <div class="stat-change" id="kdaChange"></div>
+                    </div>
+                    <div class="stat-card" style="animation-delay: 0.4s;">
+                        <div class="stat-icon">🔥</div>
+                        <div class="stat-label">Recent Form</div>
+                        <div class="stat-value" id="recentForm">0W - 0L</div>
+                    </div>
+                    <div class="stat-card" style="animation-delay: 0.5s;">
+                        <div class="stat-icon">💰</div>
+                        <div class="stat-label">Average GPM</div>
+                        <div class="stat-value" id="avgGPM">0</div>
+                    </div>
+                    <div class="stat-card" style="animation-delay: 0.6s;">
+                        <div class="stat-icon">⭐</div>
+                        <div class="stat-label">Average XPM</div>
+                        <div class="stat-value" id="avgXPM">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="heroes" class="tab-content">
+                <h2 style="margin: 30px 0; text-align: center; font-size: 2rem;">Your Hero Pool</h2>
+                <div class="hero-grid" id="heroGrid"></div>
+            </div>
+
+            <div id="matches" class="tab-content">
+                <h2 style="margin: 30px 0; text-align: center; font-size: 2rem;">Recent Battles</h2>
+                <div class="match-list" id="matchList"></div>
+            </div>
+
+            <div id="charts" class="tab-content">
+                <div class="chart-container">
+                    <div class="chart-title">Performance Trend (Last 20 Games)</div>
+                    <canvas id="performanceChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title">KDA Distribution</div>
+                    <canvas id="kdaChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title">Game Impact Metrics</div>
+                    <canvas id="impactChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://api.opendota.com/api';
+        const CDN_BASE = 'https://cdn.cloudflare.steamstatic.com';
+        
+        let playerData = null;
+        let recentMatches = [];
+        let heroStats = [];
+        let currentAccountId = null;
+
+        const heroNames = {
+            1: "Anti-Mage", 2: "Axe", 3: "Bane", 4: "Bloodseeker", 5: "Crystal Maiden",
+            6: "Drow Ranger", 7: "Earthshaker", 8: "Juggernaut", 9: "Mirana", 10: "Morphling",
+            11: "Shadow Fiend", 12: "Phantom Lancer", 13: "Puck", 14: "Pudge", 15: "Razor",
+            16: "Sand King", 17: "Storm Spirit", 18: "Sven", 19: "Tiny", 20: "Vengeful Spirit",
+            21: "Windranger", 22: "Zeus", 23: "Kunkka", 25: "Lina", 26: "Lion",
+            27: "Shadow Shaman", 28: "Slardar", 29: "Tidehunter", 30: "Witch Doctor", 31: "Lich",
+            32: "Riki", 33: "Enigma", 34: "Tinker", 35: "Sniper", 36: "Necrophos",
+            37: "Warlock", 38: "Beastmaster", 39: "Queen of Pain", 40: "Venomancer", 41: "Faceless Void",
+            42: "Wraith King", 43: "Death Prophet", 44: "Phantom Assassin", 45: "Pugna", 46: "Templar Assassin",
+            47: "Viper", 48: "Luna", 49: "Dragon Knight", 50: "Dazzle", 51: "Clockwerk",
+            52: "Leshrac", 53: "Nature's Prophet", 54: "Lifestealer", 55: "Dark Seer", 56: "Clinkz",
+            57: "Omniknight", 58: "Enchantress", 59: "Huskar", 60: "Night Stalker", 61: "Broodmother",
+            62: "Bounty Hunter", 63: "Weaver", 64: "Jakiro", 65: "Batrider", 66: "Chen",
+            67: "Spectre", 68: "Ancient Apparition", 69: "Doom", 70: "Ursa", 71: "Spirit Breaker",
+            72: "Gyrocopter", 73: "Alchemist", 74: "Invoker", 75: "Silencer", 76: "Outworld Destroyer",
+            77: "Lycan", 78: "Brewmaster", 79: "Shadow Demon", 80: "Lone Druid", 81: "Chaos Knight",
+            82: "Meepo", 83: "Treant Protector", 84: "Ogre Magi", 85: "Undying", 86: "Rubick",
+            87: "Disruptor", 88: "Nyx Assassin", 89: "Naga Siren", 90: "Keeper of the Light", 91: "Io",
+            92: "Visage", 93: "Slark", 94: "Medusa", 95: "Troll Warlord", 96: "Centaur Warrunner",
+            97: "Magnus", 98: "Timbersaw", 99: "Bristleback", 100: "Tusk", 101: "Skywrath Mage",
+            102: "Abaddon", 103: "Elder Titan", 104: "Legion Commander", 105: "Techies", 106: "Ember Spirit",
+            107: "Earth Spirit", 108: "Underlord", 109: "Terrorblade", 110: "Phoenix", 111: "Oracle",
+            112: "Winter Wyvern", 113: "Arc Warden", 114: "Monkey King", 119: "Dark Willow", 120: "Pangolier",
+            121: "Grimstroke", 123: "Hoodwink", 126: "Void Spirit", 128: "Snapfire", 129: "Mars",
+            135: "Dawnbreaker", 136: "Marci", 137: "Primal Beast", 138: "Muerta"
+        };
+
+        function getHeroIcon(heroId) {
+            const heroName = heroNames[heroId];
+            if (!heroName) return '';
+            const formatted = heroName.toLowerCase().replace(/[^a-z]/g, '_').replace(/__+/g, '_');
+            return `https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/${formatted}.png`;
+        }
+
+        function getItemIcon(itemId) {
+            if (!itemId || itemId === 0) return '';
+            // Item IDs map to specific image names - this is a simplified version
+            return `https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/items/${getItemName(itemId)}.png`;
+        }
+
+        function getItemName(itemId) {
+            const items = {
+                1: 'blink', 41: 'bottle', 36: 'magic_wand', 63: 'power_treads',
+                50: 'phase_boots', 48: 'travel_boots', 108: 'aghanims_scepter',
+                102: 'shadow_blade', 141: 'rapier', 116: 'heart', 114: 'satanic'
+            };
+            return items[itemId] || 'recipe';
+        }
+
+        async function fetchData() {
+            const input = document.getElementById('steamId').value.trim();
+            if (!input) {
+                showError('Please enter your Steam ID or OpenDota player ID');
+                return;
+            }
+
+            currentAccountId = convertTo32BitId(input);
+            await loadData();
+        }
+
+        async function refreshData() {
+            if (currentAccountId) {
+                await loadData();
+            }
+        }
+
+        async function loadData() {
+            showLoading(true);
+            hideError();
+
+            try {
+                // Fetch all data in parallel
+                const [profileRes, wlRes, matchesRes, heroesRes] = await Promise.all([
+                    fetch(`${API_BASE}/players/${currentAccountId}`),
+                    fetch(`${API_BASE}/players/${currentAccountId}/wl`),
+                    fetch(`${API_BASE}/players/${currentAccountId}/recentMatches`),
+                    fetch(`${API_BASE}/players/${currentAccountId}/heroes`)
+                ]);
+
+                if (!profileRes.ok) throw new Error('Player not found');
+
+                playerData = await profileRes.json();
+                const wl = await wlRes.json();
+                recentMatches = await matchesRes.json();
+                heroStats = await heroesRes.json();
+
+                if (!recentMatches || recentMatches.length === 0) {
+                    throw new Error('No match data available. Make sure your profile is public.');
+                }
+
+                displayProfile();
+                displayStats(wl);
+                displayRank();
+                displayHeroes();
+                displayMatches();
+                createCharts();
+
+                document.getElementById('content').style.display = 'block';
+                document.getElementById('refreshBtn').style.display = 'inline-block';
+            } catch (error) {
+                showError(error.message || 'Failed to load data. Please check your Steam ID.');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function convertTo32BitId(steamId) {
+            steamId = steamId.trim();
+            if (steamId.length < 17) return steamId;
+            try {
+                const id64 = BigInt(steamId);
+                return Number(id64 - 76561197960265728n).toString();
+            } catch (e) {
+                return steamId;
+            }
+        }
+
+        function displayProfile() {
+            if (playerData.profile) {
+                document.getElementById('profileHeader').style.display = 'flex';
+                document.getElementById('profileName').textContent = playerData.profile.personaname || 'Anonymous Hero';
+                if (playerData.profile.avatarfull) {
+                    document.getElementById('profileAvatar').style.backgroundImage = `url(${playerData.profile.avatarfull})`;
+                    document.getElementById('profileAvatar').style.backgroundSize = 'cover';
+                    document.getElementById('profileAvatar').textContent = '';
+                }
+            }
+        }
+
+        function displayStats(wl) {
+            const total = wl.win + wl.lose;
+            const winRate = total > 0 ? ((wl.win / total) * 100).toFixed(1) : 0;
+            
+            document.getElementById('totalMatches').textContent = total.toLocaleString();
+            document.getElementById('winRate').textContent = winRate + '%';
+            document.getElementById('winrateFill').style.width = winRate + '%';
+            
+            if (playerData.profile) {
+                document.getElementById('profileMatches').textContent = total.toLocaleString();
+                document.getElementById('profileWinrate').textContent = winRate + '%';
+            }
+
+            if (recentMatches.length > 0) {
+                const avgK = recentMatches.reduce((s, m) => s + m.kills, 0) / recentMatches.length;
+                const avgD = recentMatches.reduce((s, m) => s + m.deaths, 0) / recentMatches.length || 1;
+                const avgA = recentMatches.reduce((s, m) => s + m.assists, 0) / recentMatches.length;
+                const kda = ((avgK + avgA) / avgD).toFixed(2);
+                
+                document.getElementById('avgKDA').textContent = kda;
+                document.getElementById('avgGPM').textContent = Math.round(
+                    recentMatches.reduce((s, m) => s + m.gold_per_min, 0) / recentMatches.length
+                );
+                document.getElementById('avgXPM').textContent = Math.round(
+                    recentMatches.reduce((s, m) => s + m.xp_per_min, 0) / recentMatches.length
+                );
+
+                const last10 = recentMatches.slice(0, 10);
+                const recentWins = last10.filter(m => isWin(m)).length;
+                document.getElementById('recentForm').textContent = `${recentWins}W - ${10 - recentWins}L`;
+                
+                // Calculate win streak
+                let currentStreak = 0;
+                let maxStreak = 0;
+                for (const match of recentMatches) {
+                    if (isWin(match)) {
+                        currentStreak++;
+                        maxStreak = Math.max(maxStreak, currentStreak);
+                    } else {
+                        currentStreak = 0;
+                    }
+                }
+                document.getElementById('profileStreak').textContent = maxStreak;
+            }
+        }
+
+        function displayRank() {
+            let mmr = null;
+            let rankTier = null;
+            
+            if (playerData.mmr_estimate && playerData.mmr_estimate.estimate) {
+                mmr = playerData.mmr_estimate.estimate;
+            } else if (playerData.rank_tier) {
+                rankTier = playerData.rank_tier;
+                const medal = Math.floor(rankTier / 10);
+                const stars = rankTier % 10;
+                mmr = (medal * 700) + (stars * 100);
+            } else if (playerData.solo_competitive_rank) {
+                mmr = playerData.solo_competitive_rank * 50;
+            }
+
+            if (mmr || rankTier) {
+                document.getElementById('rankDisplay').style.display = 'block';
+                
+                let rank = 'Herald';
+                let medal = '🥉';
+                
+                if (mmr >= 5420 || rankTier >= 70) { rank = 'Immortal'; medal = '🔥'; }
+                else if (mmr >= 4620 || rankTier >= 60) { rank = 'Divine'; medal = '💎'; }
+                else if (mmr >= 3850 || rankTier >= 50) { rank = 'Ancient'; medal = '⚔️'; }
+                else if (mmr >= 3080 || rankTier >= 40) { rank = 'Legend'; medal = '⭐'; }
+                else if (mmr >= 2310 || rankTier >= 30) { rank = 'Archon'; medal = '🏅'; }
+                else if (mmr >= 1540 || rankTier >= 20) { rank = 'Crusader'; medal = '🗡️'; }
+                else if (mmr >= 770 || rankTier >= 10) { rank = 'Guardian'; medal = '🛡️'; }
+
+                document.getElementById('rankMedal').textContent = medal;
+                document.getElementById('rankTitle').textContent = rank;
+                document.getElementById('mmrValue').textContent = mmr ? `MMR: ~${Math.round(mmr)}` : 'Rank Tier: ' + rankTier;
+            }
+        }
+
+        function displayHeroes() {
+            const heroGrid = document.getElementById('heroGrid');
+            heroGrid.innerHTML = '';
+
+            const topHeroes = heroStats
+                .filter(h => h.games > 0)
+                .sort((a, b) => b.games - a.games)
+                .slice(0, 20);
+
+            topHeroes.forEach((hero, index) => {
+                const winRate = ((hero.win / hero.games) * 100).toFixed(1);
+                const card = document.createElement('div');
+                card.className = 'hero-card';
+                card.style.animationDelay = `${index * 0.05}s`;
+                
+                const heroIcon = getHeroIcon(hero.hero_id);
+                const iconStyle = heroIcon ? `background-image: url(${heroIcon});` : '';
+                
+                card.innerHTML = `
+                    <div class="hero-icon" style="${iconStyle}"></div>
+                    <div class="hero-name">${heroNames[hero.hero_id] || 'Hero ' + hero.hero_id}</div>
+                    <div class="hero-stats">${hero.games} games</div>
+                    <div class="hero-winrate ${winRate >= 50 ? 'good' : 'bad'}">
+                        ${winRate}% WR
+                    </div>
+                `;
+                
+                heroGrid.appendChild(card);
+            });
+        }
+
+        function displayMatches() {
+            const matchList = document.getElementById('matchList');
+            matchList.innerHTML = '';
+
+            recentMatches.slice(0, 20).forEach((match, index) => {
+                const won = isWin(match);
+                const card = document.createElement('div');
+                card.className = `match-card ${won ? 'win' : 'loss'}`;
+                card.style.animationDelay = `${index * 0.05}s`;
+                
+                const duration = `${Math.floor(match.duration / 60)}:${(match.duration % 60).toString().padStart(2, '0')}`;
+                const heroIcon = getHeroIcon(match.hero_id);
+                const iconStyle = heroIcon ? `background-image: url(${heroIcon});` : '';
+                
+                // Build items HTML
+                let itemsHtml = '';
+                for (let i = 0; i < 6; i++) {
+                    const itemId = match[`item_${i}`];
+                    if (itemId) {
+                        const itemIcon = getItemIcon(itemId);
+                        const itemStyle = itemIcon ? `background-image: url(${itemIcon});` : '';
+                        itemsHtml += `<div class="item-slot" style="${itemStyle}"></div>`;
+                    } else {
+                        itemsHtml += '<div class="item-slot"></div>';
+                    }
+                }
+                
+                card.innerHTML = `
+                    <div class="match-hero">
+                        <div class="match-hero-icon" style="${iconStyle}"></div>
+                        <div class="match-hero-name">${heroNames[match.hero_id] || 'Hero'}</div>
+                    </div>
+                    <div class="match-details">
+                        <span class="match-result ${won ? 'win' : 'loss'}">${won ? 'Victory' : 'Defeat'}</span>
+                        <div class="match-kda">
+                            ${match.kills}<span>/</span>${match.deaths}<span>/</span>${match.assists}
+                        </div>
+                        <div class="match-stats">
+                            <div class="match-stat">
+                                <span class="match-stat-label">GPM</span>
+                                <span class="match-stat-value">${match.gold_per_min}</span>
+                            </div>
+                            <div class="match-stat">
+                                <span class="match-stat-label">XPM</span>
+                                <span class="match-stat-value">${match.xp_per_min}</span>
+                            </div>
+                            <div class="match-stat">
+                                <span class="match-stat-label">LH/DN</span>
+                                <span class="match-stat-value">${match.last_hits || 0}/${match.denies || 0}</span>
+                            </div>
+                        </div>
+                        <div class="match-items">${itemsHtml}</div>
+                    </div>
+                    <div class="match-meta">
+                        <div class="match-duration">${duration}</div>
+                        <div class="match-mode">${getGameMode(match.game_mode)}</div>
+                        <div class="match-time">${getTimeAgo(match.start_time)}</div>
+                    </div>
+                `;
+                
+                matchList.appendChild(card);
+            });
+        }
+
+        function createCharts() {
+            // Performance Chart
+            const perfCtx = document.getElementById('performanceChart').getContext('2d');
+            const last20 = recentMatches.slice(0, 20).reverse();
+            
+            let wins = 0;
+            const winRateData = last20.map((match, index) => {
+                if (isWin(match)) wins++;
+                return (wins / (index + 1)) * 100;
+            });
+
+            new Chart(perfCtx, {
+                type: 'line',
+                data: {
+                    labels: last20.map((_, i) => `Game ${i + 1}`),
+                    datasets: [{
+                        label: 'Win Rate %',
+                        data: winRateData,
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#8596a5' }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            ticks: { color: '#8596a5' },
+                            grid: { color: '#2a2d35' }
+                        },
+                        x: {
+                            ticks: { color: '#8596a5' },
+                            grid: { color: '#2a2d35' }
+                        }
+                    }
+                }
+            });
+
+            // KDA Chart
+            const kdaCtx = document.getElementById('kdaChart').getContext('2d');
+            const kdaData = last20.map(match => {
+                const deaths = match.deaths || 1;
+                return ((match.kills + match.assists) / deaths);
+            });
+
+            new Chart(kdaCtx, {
+                type: 'bar',
+                data: {
+                    labels: last20.map((_, i) => `Game ${i + 1}`),
+                    datasets: [{
+                        label: 'KDA Ratio',
+                        data: kdaData,
+                        backgroundColor: last20.map(m => isWin(m) ? 'rgba(76, 175, 80, 0.6)' : 'rgba(244, 67, 54, 0.6)'),
+                        borderColor: last20.map(m => isWin(m) ? '#4CAF50' : '#f44336'),
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#8596a5' }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            ticks: { color: '#8596a5' },
+                            grid: { color: '#2a2d35' }
+                        },
+                        x: {
+                            ticks: { color: '#8596a5' },
+                            grid: { color: '#2a2d35' }
+                        }
+                    }
+                }
+            });
+
+            // Impact Chart
+            const impactCtx = document.getElementById('impactChart').getContext('2d');
+            const avgGPM = recentMatches.reduce((s, m) => s + m.gold_per_min, 0) / recentMatches.length;
+            const avgXPM = recentMatches.reduce((s, m) => s + m.xp_per_min, 0) / recentMatches.length;
+            const avgKills = recentMatches.reduce((s, m) => s + m.kills, 0) / recentMatches.length;
+            const avgDeaths = recentMatches.reduce((s, m) => s + m.deaths, 0) / recentMatches.length;
+            const avgAssists = recentMatches.reduce((s, m) => s + m.assists, 0) / recentMatches.length;
+
+            new Chart(impactCtx, {
+                type: 'radar',
+                data: {
+                    labels: ['GPM', 'XPM', 'Kills', 'Deaths', 'Assists'],
+                    datasets: [{
+                        label: 'Average Performance',
+                        data: [
+                            (avgGPM / 500) * 100,
+                            (avgXPM / 600) * 100,
+                            (avgKills / 15) * 100,
+                            Math.max(0, 100 - (avgDeaths / 10) * 100),
+                            (avgAssists / 20) * 100
+                        ],
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.2)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#8596a5' }
+                        }
+                    },
+                    scales: {
+                        r: {
+                            ticks: { color: '#8596a5', backdropColor: 'transparent' },
+                            grid: { color: '#2a2d35' },
+                            angleLines: { color: '#2a2d35' },
+                            pointLabels: { color: '#8596a5' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function switchTab(event, tabName) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+        }
+
+        function isWin(match) {
+            return (match.player_slot < 128 && match.radiant_win) || 
+                   (match.player_slot >= 128 && !match.radiant_win);
+        }
+
+        function getGameMode(mode) {
+            const modes = {
+                1: 'All Pick', 2: 'Captains Mode', 3: 'Random Draft',
+                4: 'Single Draft', 5: 'All Random', 22: 'Ranked',
+                23: 'Turbo', 12: 'Least Played', 14: 'Limited Heroes'
+            };
+            return modes[mode] || 'Custom';
+        }
+
+        function getTimeAgo(timestamp) {
+            const diff = Date.now() / 1000 - timestamp;
+            if (diff < 3600) return `${Math.floor(diff / 60)} mins ago`;
+            if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
+            if (diff < 604800) return `${Math.floor(diff / 86400)} days ago`;
+            return `${Math.floor(diff / 604800)} weeks ago`;
+        }
+
+        function showLoading(show) {
+            document.querySelector('.loading').classList.toggle('active', show);
+        }
+
+        function showError(msg) {
+            const error = document.getElementById('error');
+            error.textContent = msg;
+            error.classList.add('active');
+        }
+
+        function hideError() {
+            document.getElementById('error').classList.remove('active');
+        }
+
+        // Enter key support
+        document.getElementById('steamId').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') fetchData();
+        });
+    </script>
+</body>
+</html>
